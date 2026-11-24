@@ -22,47 +22,47 @@
 </script>
 
 <section class="telemetry" aria-label="AI search telemetry">
-  {#if telemetry}
-    <span class="algo" class:searching={thinking}>
-      {thinking ? 'searching' : telemetry.algorithm}
-    </span>
-    <dl class="items">
-      <div class="item">
-        <dt>depth</dt>
-        <dd>{telemetry.depthReached}</dd>
-      </div>
-      <div class="item" title={`${exactFmt.format(telemetry.nodesEvaluated)} nodes`}>
-        <dt>nodes</dt>
-        <dd>{formatCompact(telemetry.nodesEvaluated)}</dd>
-      </div>
-      <div class="item" title={`${exactFmt.format(telemetry.ttHits)} transposition table hits`}>
-        <dt>tt</dt>
-        <dd>{formatCompact(telemetry.ttHits)}</dd>
-      </div>
-      <div class="item">
-        <dt>time</dt>
-        <dd>{telemetry.elapsedMs.toFixed(1)}ms</dd>
-      </div>
-      <div class="item" title={`${exactFmt.format(telemetry.nodesPerSec)} nodes per second`}>
-        <dt>rate</dt>
-        <dd>{formatCompact(telemetry.nodesPerSec)}/s</dd>
-      </div>
-    </dl>
-  {:else}
-    <span class="placeholder">
-      {thinking ? 'AI searching...' : 'AI telemetry appears after the first AI move.'}
-    </span>
-  {/if}
+  <dl class="grid">
+    <div class="cell">
+      <dt>algo</dt>
+      <dd class:searching={thinking}>
+        {thinking ? 'searching' : (telemetry?.algorithm ?? '-')}
+      </dd>
+    </div>
+    <div class="cell">
+      <dt>depth</dt>
+      <dd>{telemetry ? telemetry.depthReached : '-'}</dd>
+    </div>
+    <div
+      class="cell"
+      title={telemetry ? `${exactFmt.format(telemetry.nodesEvaluated)} nodes` : undefined}
+    >
+      <dt>nodes</dt>
+      <dd>{telemetry ? formatCompact(telemetry.nodesEvaluated) : '-'}</dd>
+    </div>
+    <div
+      class="cell"
+      title={telemetry ? `${exactFmt.format(telemetry.ttHits)} transposition table hits` : undefined}
+    >
+      <dt>tt</dt>
+      <dd>{telemetry ? formatCompact(telemetry.ttHits) : '-'}</dd>
+    </div>
+    <div class="cell">
+      <dt>time</dt>
+      <dd>{telemetry ? `${telemetry.elapsedMs.toFixed(1)}ms` : '-'}</dd>
+    </div>
+    <div
+      class="cell"
+      title={telemetry ? `${exactFmt.format(telemetry.nodesPerSec)} nodes per second` : undefined}
+    >
+      <dt>rate</dt>
+      <dd>{telemetry ? `${formatCompact(telemetry.nodesPerSec)}/s` : '-'}</dd>
+    </div>
+  </dl>
 </section>
 
 <style>
   .telemetry {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 1rem;
-    min-height: 2.25rem;
     padding: 0.45rem 0.75rem;
     border-radius: 0.6rem;
     border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
@@ -71,34 +71,26 @@
     font-size: 0.78rem;
   }
 
-  .algo {
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-  }
-
-  .algo.searching {
-    color: var(--accent);
-  }
-
-  .items {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem 0.9rem;
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.35rem 0.65rem;
     margin: 0;
   }
 
-  .item {
-    display: inline-flex;
+  .cell {
+    display: flex;
     align-items: baseline;
-    gap: 0.3rem;
+    justify-content: space-between;
+    gap: 0.4rem;
+    min-width: 0;
     white-space: nowrap;
   }
 
   dt {
     color: var(--muted);
     opacity: 0.8;
+    flex-shrink: 0;
   }
 
   dd {
@@ -107,11 +99,32 @@
     opacity: 0.85;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .placeholder {
-    opacity: 0.8;
-    white-space: nowrap;
+  dd.searching {
+    color: var(--accent);
+  }
+
+  @media (max-width: 640px) {
+    .telemetry {
+      padding: 0.55rem 0.8rem;
+    }
+
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.4rem 1.25rem;
+    }
+
+    .cell {
+      padding-block: 0.1rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+    }
+
+    .cell:nth-last-child(-n + 2) {
+      border-bottom: none;
+    }
   }
 </style>

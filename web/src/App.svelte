@@ -44,6 +44,7 @@
   let snapshot = $state<GameSnapshot | null>(null);
   let telemetry = $state<SearchTelemetry | null>(null);
   let thinking = $state(false);
+  let started = $state(false);
   let errorMsg = $state<string | null>(null);
   let runToken = 0;
 
@@ -51,6 +52,7 @@
     while (
       client &&
       token === runToken &&
+      started &&
       snapshot &&
       snapshot.outcome.status === 'ongoing' &&
       snapshot.players[snapshot.currentTurn].kind.type === 'ai'
@@ -75,14 +77,33 @@
     }
   }
 
-  async function startNewGame(nextConfig: GameConfig) {
+  async function initBoard(nextConfig: GameConfig, autoStart: boolean) {
     if (!client) return;
     const token = ++runToken;
     errorMsg = null;
     telemetry = null;
     thinking = false;
+    started = autoStart;
     try {
       snapshot = await client.init($state.snapshot(nextConfig));
+      if (autoStart) {
+        await driveAiTurns(token);
+      }
+    } catch (err) {
+      errorMsg = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  async function handleStart() {
+    if (!client || thinking) return;
+    const token = ++runToken;
+    errorMsg = null;
+    telemetry = null;
+    started = true;
+    try {
+      if (!snapshot || snapshot.history.length > 0 || snapshot.outcome.status !== 'ongoing') {
+        snapshot = await client.reset();
+      }
       await driveAiTurns(token);
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : String(err);
@@ -91,7 +112,11 @@
 
   async function handlePlay(cell: number) {
     if (!client || thinking || !snapshot) return;
+    if (!started && snapshot.players[snapshot.currentTurn].kind.type === 'ai') {
+      return;
+    }
     const token = ++runToken;
+    started = true;
     errorMsg = null;
     try {
       snapshot = await client.playMove(cell);
@@ -114,24 +139,24 @@
 
   async function handleReset() {
     if (!client) return;
-    const token = ++runToken;
+    ++runToken;
     errorMsg = null;
     telemetry = null;
     thinking = false;
+    started = false;
     snapshot = await client.reset();
-    await driveAiTurns(token);
   }
 
   function handleApply(next: GameConfig, algo: AiAlgorithm, budget: number) {
     config = next;
     aiAlgorithm = algo;
     timeBudgetMs = budget;
-    startNewGame(next);
+    initBoard(next, false);
   }
 
   onMount(() => {
     client = new EngineClient();
-    startNewGame(config);
+    initBoard(config, false);
   });
 
   onDestroy(() => {
@@ -153,6 +178,9 @@
       <button type="button" onclick={handleReset} disabled={thinking}>
         Reset
       </button>
+      <button type="button" class="primary" onclick={handleStart} disabled={thinking}>
+        Start
+      </button>
     </div>
   </header>
 
@@ -164,6 +192,7 @@
     <div class="stage">
       {#if snapshot}
         {@const active = snapshot.players[snapshot.currentTurn]}
+        {@const awaitingStart = !started && active.kind.type === 'ai' && snapshot.outcome.status === 'ongoing'}
         <div class="status-bar" aria-live="polite">
           {#if snapshot.outcome.status === 'win'}
             {@const winner = snapshot.players[snapshot.outcome.player]}
@@ -172,6 +201,11 @@
             <span class="tag">{snapshot.outcome.kind}</span>
           {:else if snapshot.outcome.status === 'draw'}
             <strong>It's a draw!</strong>
+          {:else if awaitingStart}
+            <span class="dot" style:background={active.color}></span>
+            <span>
+              Ready: <strong>{active.name} ({active.symbol})</strong> moves first. Press Start.
+            </span>
           {:else}
             <span class="dot" style:background={active.color}></span>
             <span>
@@ -183,7 +217,7 @@
           {/if}
         </div>
 
-        <Board {snapshot} disabled={thinking} onPlay={handlePlay} />
+        <Board {snapshot} disabled={thinking || awaitingStart} onPlay={handlePlay} />
         <TelemetryHud {telemetry} {thinking} />
       {:else}
         <p class="loading">Loading Rust WASM engine…</p>
@@ -235,6 +269,16 @@
     border: 1px solid var(--border);
     background: var(--surface);
     font-weight: 600;
+  }
+
+  .actions button.primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .actions button.primary:not(:disabled):hover {
+    filter: brightness(1.08);
   }
 
   .actions button:disabled {

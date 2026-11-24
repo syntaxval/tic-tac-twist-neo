@@ -104,7 +104,7 @@
   </div>
 
   <button type="button" class="apply-btn" onclick={apply}>
-    Apply &amp; Start New Game
+    Apply
   </button>
 </section>
 
