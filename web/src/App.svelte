@@ -82,7 +82,7 @@
     telemetry = null;
     thinking = false;
     try {
-      snapshot = await client.init(nextConfig);
+      snapshot = await client.init($state.snapshot(nextConfig));
       await driveAiTurns(token);
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : String(err);

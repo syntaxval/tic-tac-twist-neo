@@ -39,7 +39,9 @@ export class EngineClient {
   }
 
   init(config: GameConfig): Promise<GameSnapshot> {
-    return this.call<GameSnapshot>({ type: 'init', config });
+    // Strip any framework reactive Proxies before structured-cloning to the Worker.
+    const plainConfig: GameConfig = JSON.parse(JSON.stringify(config));
+    return this.call<GameSnapshot>({ type: 'init', config: plainConfig });
   }
 
   playMove(cell: number): Promise<GameSnapshot> {
