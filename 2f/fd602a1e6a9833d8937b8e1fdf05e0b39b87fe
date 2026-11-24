@@ -1,0 +1,14 @@
+web/src/components/Controls.svelte
+  h_7e8b63f114c5a6 76,95,141-143,146-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2ffd602a1e6a9833d8937b8e1fdf05e0b39b87fe",
+  "prompts": {},
+  "humans": {
+    "h_7e8b63f114c5a6": {
+      "author": "syntaxval <29269124+syntaxval@users.noreply.github.com>"
+    }
+  }
+}
