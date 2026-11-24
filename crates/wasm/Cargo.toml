@@ -1,8 +1,8 @@
 [package]
 name = "tic-tac-twist-wasm"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+version = "0.2.0"
+edition = "2024"
+license = "Apache-2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
