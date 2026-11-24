@@ -1,52 +1,43 @@
 # Tic-Tac-Twist Neo
 
-**A blazingly fast, zero-backend 3-player strategy game powered by a Rust `u128` bitboard engine — compiled to WebAssembly for the browser and native machine code for the terminal.**
+A three-player strategy game backed by a Rust `u128` bitboard engine. The same engine compiles to WebAssembly for the browser and to a native binary for the terminal.
 
-[![Play Live](https://img.shields.io/badge/Play%20Live-GitHub%20Pages-7c3aed?style=for-the-badge)](https://syntaxval.github.io/tic-tac-twist-neo/)
+[![Play live](https://img.shields.io/badge/Play%20Live-GitHub%20Pages-7c3aed?style=for-the-badge)](https://syntaxval.github.io/tic-tac-twist-neo/)
 [![Rust](https://img.shields.io/badge/Rust-Engine%20%2B%20CLI-000000?style=for-the-badge&logo=rust)](crates/engine)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-57%20kB%20gzip-654ff0?style=for-the-badge&logo=webassembly)](crates/wasm)
 [![Svelte 5](https://img.shields.io/badge/Svelte%205-24%20kB%20gzip-ff3e00?style=for-the-badge&logo=svelte)](web)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge)](LICENSE)
 
----
+[Play the web version on GitHub Pages](https://syntaxval.github.io/tic-tac-twist-neo/). The engine runs locally inside a browser Web Worker with no backend server.
 
-### [Launch the Live Web App →](https://syntaxval.github.io/tic-tac-twist-neo/)
+## Overview
 
-Play directly in your desktop or mobile browser with **zero server round-trips** — the Rust AI runs locally inside a Web Worker while keeping the UI locked at 60–120 fps.
+Tic-Tac-Twist extends Tic-Tac-Toe to 3 players, board sizes from 3x3 to 10x10, configurable K-in-a-row win lengths, and an optional Four Corners win rule.
 
----
+A single pure-Rust crate (`crates/engine`) owns all board state, win detection, and AI search. Two thin adapters sit on top of it:
 
-## Why This Exists
+- `crates/wasm` plus `web/` runs the engine in a Web Worker behind a 24 kB gzipped Svelte 5 interface.
+- `crates/cli` compiles the engine into a native terminal binary with ANSI colors and Unicode box drawing.
 
-Tic-Tac-Twist takes classic Tic-Tac-Toe and raises the stakes: **3 players**, scalable boards from **3×3 up to 10×10**, configurable **K-in-a-row** and **Four Corners** win rules, and a real-time multi-player AI.
+## Technical details
 
-Most implementations either choke on a 10×10 search space or duplicate game logic across backend and frontend. **Tic-Tac-Twist Neo** solves both with a single pure-Rust domain engine compiled to two thin targets:
-- **Browser / Mobile (WASM + Web Worker):** Near-native AI search throughput with a ~24 kB Svelte 5 UI and live search telemetry.
-- **Terminal (Native CLI):** Direct ANSI + Unicode terminal experience sharing 100% of the exact same rules and AI.
-
----
-
-## Engineering Highlights
-
-| Capability | Design |
+| Area | Implementation |
 | :--- | :--- |
-| **Board Representation** | **`u128` bitboards** (1 bit per cell up to 10×10 = 100 bits) — single-cycle win checks, $O(1)$ coordinate math, and zero-allocation make/unmake in search. |
-| **3-Player Game AI** | Tactical 1-move win/block layer + pluggable **Paranoid Alpha-Beta** (iterative deepening, time budget, Zobrist hashing, 65k Transposition Table), **MaxN** (multi-player utility vectors), and **Greedy** (1-ply baseline). |
-| **Live Telemetry HUD** | Every AI turn emits structured search metrics: algorithm, depth reached, nodes evaluated, TT hit count, elapsed ms, and nodes/sec. |
-| **Composable Rules** | `WinRule` strategy trait (`LinesRule` + `FourCornersRule`) — new win conditions plug in cleanly with zero global config coupling. |
-| **Accessible, Lean UI** | Zero-dependency CSS Grid + SVG in **Svelte 5** (runes), automatic light/dark `color-scheme`, roving-tabindex arrow-key spatial navigation, and customizable `<select>` controls. |
-
----
+| Board representation | One `u128` bitboard per player holds up to 100 cells (10x10). Win checks use a single bitwise mask test, coordinate conversion runs in O(1) integer math, and search make/unmake allocates no heap memory. |
+| Three-player AI | A tactical pass checks for an immediate winning move or a one-move opponent threat. Deeper search supports Paranoid Alpha-Beta (iterative deepening, time budget, Zobrist hashing, 65,536-entry transposition table), MaxN (per-player score vectors), and a 1-ply Greedy heuristic. |
+| Search telemetry | Every AI turn reports algorithm name, depth reached, nodes evaluated, transposition table hits, elapsed milliseconds, and nodes per second. |
+| Win rules | `LinesRule` and `FourCornersRule` implement a `WinRule` trait and precompute bitmasks from the active board size. |
+| Web UI | Scoped CSS Grid and SVG in Svelte 5 with zero UI library dependencies, automatic light and dark `color-scheme`, roving-tabindex arrow-key navigation, and `appearance: base-select` dropdowns with a fallback. |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph Core["crates/engine · Pure Rust (zero I/O)"]
+    subgraph Core["crates/engine (Pure Rust, no I/O)"]
         Board["u128 Bitboards"]
         Rules["WinRule Strategies"]
         Game["Game State Machine"]
-        AI["Paranoid · MaxN · Greedy + Telemetry"]
+        AI["Paranoid, MaxN, Greedy + Telemetry"]
     end
 
     subgraph Native["crates/cli"]
@@ -66,36 +57,40 @@ flowchart LR
 ```text
 tic-tac-twist-neo/
 ├── crates/
-│   ├── engine/          # Pure Rust core: bitboards, rules, state machine, 3-player AI
+│   ├── engine/          # Pure Rust core: bitboards, rules, state machine, AI
 │   ├── cli/             # Native terminal binary
-│   └── wasm/            # Thin wasm-bindgen bridge
-├── web/                 # Svelte 5 + TypeScript + Vite static web app (Web Worker)
-├── docs/adr/            # Architecture Decision Records
-└── .github/workflows/   # Automated tests, WASM build, and GitHub Pages deployment
+│   └── wasm/            # wasm-bindgen bridge
+├── web/                 # Svelte 5, TypeScript, and Vite static web app
+├── docs/adr/            # Architecture decision records
+└── .github/workflows/   # Automated tests, WASM build, and GitHub Pages deploy
 ```
-
----
 
 ## Quickstart
 
-### Play Online
-Open **[syntaxval.github.io/tic-tac-twist-neo](https://syntaxval.github.io/tic-tac-twist-neo/)** — no install required.
+### Play online
 
-### Play in the Terminal (Native CLI)
+Open [syntaxval.github.io/tic-tac-twist-neo](https://syntaxval.github.io/tic-tac-twist-neo/) in a desktop or mobile browser.
+
+### Play in the terminal
+
 ```sh
 cargo run --release -p tic-tac-twist-cli -- --size 5 --win-length 4 --ai paranoid
 ```
-Run with `--help` to see all options (`--size`, `--win-length`, `--four-corners`, `--ai paranoid|maxn|greedy`, `--time-ms`).
 
-### Run the Web App Locally
-Requires Rust (`wasm32-unknown-unknown` target), `wasm-pack`, Node.js 22+, and `pnpm`:
+Run with `--help` to list all flags (`--size`, `--win-length`, `--four-corners`, `--ai paranoid|maxn|greedy`, `--time-ms`).
+
+### Run the web app locally
+
+Requires Rust with the `wasm32-unknown-unknown` target, `wasm-pack`, Node.js 22+, and `pnpm`:
+
 ```sh
 wasm-pack build crates/wasm --target web --out-dir ../../web/src/wasm
 pnpm --dir web install
 pnpm --dir web dev
 ```
 
-### Run Tests & Lints
+### Run tests and lints
+
 ```sh
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
@@ -103,16 +98,13 @@ pnpm --dir web check
 pnpm --dir web build
 ```
 
----
+## Architecture decision records
 
-## Architecture Decision Records
-
-Every major trade-off is documented in `docs/adr/`:
-- [ADR 001: `u128` Bitboards for 3×3–10×10 Boards](docs/adr/001-u128-bitboards.md)
-- [ADR 002: 3-Player AI — Paranoid Alpha-Beta vs. MaxN](docs/adr/002-three-player-ai-paranoid-vs-maxn.md)
-- [ADR 003: Single Rust Engine → WASM Web Worker + Native CLI](docs/adr/003-rust-wasm-web-worker.md)
-- [ADR 004: CSS Grid + SVG (Svelte 5) Over WebGL](docs/adr/004-dom-svg-over-webgl.md)
+- [ADR 001: `u128` bitboards for 3x3 to 10x10 boards](docs/adr/001-u128-bitboards.md)
+- [ADR 002: Three-player AI with Paranoid Alpha-Beta and MaxN](docs/adr/002-three-player-ai-paranoid-vs-maxn.md)
+- [ADR 003: One Rust engine for WASM Web Worker and native CLI](docs/adr/003-rust-wasm-web-worker.md)
+- [ADR 004: CSS Grid and SVG in Svelte 5 instead of WebGL](docs/adr/004-dom-svg-over-webgl.md)
 
 ## License
 
-Released under the [Apache License, Version 2.0](LICENSE).
+Apache License, Version 2.0. See [LICENSE](LICENSE).

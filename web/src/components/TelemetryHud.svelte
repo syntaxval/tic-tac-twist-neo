@@ -8,112 +8,110 @@
 
   let { telemetry, thinking }: Props = $props();
 
-  const fmt = new Intl.NumberFormat();
+  const exactFmt = new Intl.NumberFormat();
+
+  function formatCompact(value: number): string {
+    if (value >= 1_000_000) {
+      return `${(value / 1_000_000).toFixed(2)}M`;
+    }
+    if (value >= 1_000) {
+      return `${(value / 1_000).toFixed(1)}k`;
+    }
+    return String(value);
+  }
 </script>
 
-<section class="hud" aria-label="AI search telemetry">
-  <div class="hud-header">
-    <h2>AI Telemetry (Rust → WASM)</h2>
-    {#if thinking}
-      <span class="pill active">Searching…</span>
-    {:else if telemetry}
-      <span class="pill">{telemetry.algorithm}</span>
-    {/if}
-  </div>
-
+<section class="telemetry" aria-label="AI search telemetry">
   {#if telemetry}
-    <dl class="metrics">
-      <div>
-        <dt>Depth</dt>
+    <span class="algo" class:searching={thinking}>
+      {thinking ? 'searching' : telemetry.algorithm}
+    </span>
+    <dl class="items">
+      <div class="item">
+        <dt>depth</dt>
         <dd>{telemetry.depthReached}</dd>
       </div>
-      <div>
-        <dt>Nodes</dt>
-        <dd>{fmt.format(telemetry.nodesEvaluated)}</dd>
+      <div class="item" title={`${exactFmt.format(telemetry.nodesEvaluated)} nodes`}>
+        <dt>nodes</dt>
+        <dd>{formatCompact(telemetry.nodesEvaluated)}</dd>
       </div>
-      <div>
-        <dt>TT Hits</dt>
-        <dd>{fmt.format(telemetry.ttHits)}</dd>
+      <div class="item" title={`${exactFmt.format(telemetry.ttHits)} transposition table hits`}>
+        <dt>tt</dt>
+        <dd>{formatCompact(telemetry.ttHits)}</dd>
       </div>
-      <div>
-        <dt>Time</dt>
-        <dd>{telemetry.elapsedMs.toFixed(1)} ms</dd>
+      <div class="item">
+        <dt>time</dt>
+        <dd>{telemetry.elapsedMs.toFixed(1)}ms</dd>
       </div>
-      <div>
-        <dt>Throughput</dt>
-        <dd>{fmt.format(telemetry.nodesPerSec)} n/s</dd>
+      <div class="item" title={`${exactFmt.format(telemetry.nodesPerSec)} nodes per second`}>
+        <dt>rate</dt>
+        <dd>{formatCompact(telemetry.nodesPerSec)}/s</dd>
       </div>
     </dl>
   {:else}
-    <p class="empty">Waiting for the first AI move…</p>
+    <span class="placeholder">
+      {thinking ? 'AI searching...' : 'AI telemetry appears after the first AI move.'}
+    </span>
   {/if}
 </section>
 
 <style>
-  .hud {
-    padding: 1.1rem;
-    border-radius: 1rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-  }
-
-  .hud-header {
+  .telemetry {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
+    gap: 0.5rem 1rem;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 0.6rem;
+    border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    color: var(--muted);
+    font-size: 0.78rem;
   }
 
-  h2 {
-    margin: 0;
-    font-size: 1rem;
-  }
-
-  .pill {
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
+  .algo {
     font-weight: 600;
-    background: var(--surface-alt);
-    border: 1px solid var(--border);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
   }
 
-  .pill.active {
-    border-color: var(--accent);
+  .algo.searching {
     color: var(--accent);
   }
 
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-    gap: 0.6rem;
+  .items {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.9rem;
     margin: 0;
   }
 
-  .metrics div {
-    padding: 0.55rem 0.65rem;
-    border-radius: 0.6rem;
-    background: var(--surface-alt);
+  .item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    white-space: nowrap;
   }
 
   dt {
-    font-size: 0.72rem;
     color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    opacity: 0.8;
   }
 
   dd {
-    margin: 0.15rem 0 0;
-    font-size: 0.95rem;
-    font-weight: 700;
+    margin: 0;
+    color: var(--text);
+    opacity: 0.85;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
-  .empty {
-    margin: 0;
-    font-size: 0.875rem;
-    color: var(--muted);
+  .placeholder {
+    opacity: 0.8;
+    white-space: nowrap;
   }
 </style>

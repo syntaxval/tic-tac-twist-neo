@@ -1,14 +1,18 @@
-# ADR 003: Single Rust Engine → WASM Web Worker + Native CLI (No Backend for v1)
+# ADR 003: One Rust engine for WASM Web Worker and native CLI
 
 ## Context
-We want near-native AI search throughput, a responsive web/mobile UI, and parity with the 2019 terminal CLI — without duplicating game logic or operating a server for local play.
+
+The project needs fast AI search, a responsive browser and mobile interface, and terminal CLI support without duplicating game rules or running a backend server for local play.
 
 ## Decision
-Build `crates/engine` as a pure, I/O-free Rust crate and compile it to two thin targets:
-- `crates/cli`: Native terminal binary with ANSI colors and Unicode box drawing.
-- `crates/wasm`: `wasm-bindgen` module executed inside a browser **Web Worker**, communicating with the UI via typed async messages.
+
+Keep `crates/engine` free of I/O and compile it to two targets:
+
+- `crates/cli` builds a native terminal binary with ANSI colors and Unicode box drawing.
+- `crates/wasm` exposes a `wasm-bindgen` wrapper that runs inside a browser Web Worker and exchanges plain JSON-compatible messages with the UI.
 
 ## Consequences
-- **Zero network latency & offline-ready:** All AI search runs locally on the client device with zero main-thread jank.
-- **Single source of truth:** Rules, bitboards, and AI behavior are identical in CLI and Web.
-- **Future multiplayer path:** Because `crates/engine` has zero I/O, it can later be embedded in an Axum/WebSocket server without rewriting domain logic.
+
+- AI moves run locally on the client with zero network latency and do not block the browser main thread.
+- The CLI and web app share identical board rules, bitboards, and AI search code.
+- Because `crates/engine` performs no I/O, a future WebSocket server can import the same crate without rewriting game logic.
