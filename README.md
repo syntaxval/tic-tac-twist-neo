@@ -1,62 +1,51 @@
-## prerequisites
+# Tic-Tac-Twist Neo
 
+A Principal-level re-engineering of the original 2019 take-home interview project (`tic-tac-twist`), preserving the original snapshot in git history under tag [`v0.1.0-interview-2019`](../../tags).
 
-`Node.js®` v.10 or higher
+## Architecture
 
-## installation
+```text
+tic-tac-twist-neo/
+├── crates/
+│   ├── engine/   # Pure Rust: u128 bitboards, composable WinRules, Paranoid/MaxN/Greedy AI + telemetry
+│   ├── cli/      # Native terminal UI (ANSI colors + Unicode grid, parity with 2019 CLI)
+│   └── wasm/     # Thin wasm-bindgen bridge compiled to WebAssembly
+├── web/          # Svelte 5 + TypeScript + Vite UI (CSS Grid + SVG, Web Worker, live AI telemetry)
+└── docs/adr/     # Architecture Decision Records defending every key trade-off
+```
 
-In order to play the game, navigate to the root directory and install all
-required dependencies with:
+### Key Upgrades over `v0.1.0-interview-2019`
+- **`u128` Bitboard Engine:** 3×3 through 10×10 (up to 100 cells) fits in a single `u128` per player with $O(1)$ coordinate conversion and zero-allocation make/unmake.
+- **Real 3-Player AI:** Replaces the broken 2019 minimax with a tactical win/block fast path + selectable **Paranoid Alpha-Beta** (iterative deepening + time budget + Zobrist Transposition Table), **MaxN**, and **Greedy** strategies, all reporting live telemetry.
+- **Composable Rules:** `LinesRule` (with configurable `winLength`) and `FourCornersRule` use actual board dimensions — zero global config coupling.
+- **Strict Domain / I/O Separation:** One pure Rust core drives both the native CLI and the browser Web Worker WASM app.
 
-`npm install`
+## Quickstart
 
+### 1. Run the Rust test suite
+```sh
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+```
 
-## play
+### 2. Play in the Terminal (Native CLI)
+```sh
+cargo run --release -p tic-tac-twist-cli -- --size 5 --win-length 4 --ai paranoid
+```
+Run with `--help` for all options (`--size`, `--win-length`, `--four-corners`, `--ai`, `--time-ms`).
 
-Start the game from the root directory with:
+### 3. Play in the Browser (Web / Mobile UI)
+```sh
+wasm-pack build crates/wasm --target web --out-dir ../../web/src/wasm
+pnpm --dir web install
+pnpm --dir web dev
+```
 
-`npm start`
+## Architecture Decision Records
+- [ADR 001: `u128` Bitboards](docs/adr/001-u128-bitboards.md)
+- [ADR 002: 3-Player AI — Paranoid Alpha-Beta vs. MaxN](docs/adr/002-three-player-ai-paranoid-vs-maxn.md)
+- [ADR 003: Rust Engine → WASM Web Worker + Native CLI](docs/adr/003-rust-wasm-web-worker.md)
+- [ADR 004: CSS Grid + SVG (Svelte 5) Over WebGL](docs/adr/004-dom-svg-over-webgl.md)
 
-
-## how to play
-
-The game follows the regular _tic-tac-toe_
-[rules](https://en.wikipedia.org/wiki/Tic-tac-toe) with a twist. There are
-three players (one of the is the "AI"). Boards can be of any size between 3x3
-up to 10x10. The rules are always to fill horizontal, diagonal or vertical rows
-with the same symbol (owned by a player). Oh, and the symbols can be any valid
-`UTF8` character.
-
-Take turns by entering your desired position. For example: `1,3` would place
-your symbol at __first row__ and __third column__. Invalid or out of range
-input is ignored.
-
-
-## documentation
-
-Code documentation can be generated with:
-
-`npm run jsdoc`
-
-After running the documentation generator, the documentation root can be found
-under `docs` directory with `index.html` as a home file.
-
-
-## test
-
-Execute test suite with:
-
-`npm run test`
-
-The game was tested on `Linux` and `MacOSX` terminals.
-
-## license
-
-**tic-tac-toe** is released under the _Apache License, Version 2.0_. See the
-[LICENSE](./LICENSE) for more details.
-
-
-## references
-
-* [AI Player with Minimax Algorithm](https://medium.com/@alialaa/tic-tac-toe-with-javascript-es2015-ai-player-with-minimax-algorithm-59f069f46efa)
-* [Minimax Algorithm - Wikipedia](https://en.wikipedia.org/wiki/Minimax)
+## License
+Apache License, Version 2.0. See [LICENSE](./LICENSE).

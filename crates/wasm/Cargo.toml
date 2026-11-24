@@ -1,0 +1,14 @@
+[package]
+name = "tic-tac-twist-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+tic-tac-twist-engine = { path = "../engine" }
+wasm-bindgen = "0.2"
