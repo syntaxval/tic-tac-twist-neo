@@ -168,7 +168,8 @@
     onkeydown={handleKeydown}
   >
     {#each snapshot.cells as owner, idx (idx)}
-      {@const player = owner !== null ? snapshot.players[owner] : null}
+      {@const isOccupied = owner != null}
+      {@const player = isOccupied ? snapshot.players[owner] : null}
       {@const isWinCell = winningSet.has(idx)}
       {@const isLast = idx === lastMove}
       {@const row = Math.floor(idx / snapshot.boardSize) + 1}
@@ -179,10 +180,10 @@
         data-cell={idx}
         tabindex={focusedIndex === idx ? 0 : -1}
         class="cell"
-        class:occupied={owner !== null}
+        class:occupied={isOccupied}
         class:win-cell={isWinCell}
         class:last-move={isLast}
-        disabled={disabled || owner !== null || snapshot.outcome.status !== 'ongoing'}
+        disabled={disabled || isOccupied || snapshot.outcome.status !== 'ongoing'}
         aria-label={`Row ${row}, Column ${col}: ${player ? player.name : 'empty'}`}
         onclick={() => onPlay(idx)}
         onfocus={() => (focusedIndex = idx)}

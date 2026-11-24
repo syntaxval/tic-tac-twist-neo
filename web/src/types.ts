@@ -40,7 +40,7 @@ export interface GameSnapshot {
   boardSize: number;
   winLength: number;
   fourCorners: boolean;
-  cells: (number | null)[];
+  cells: (number | null | undefined)[];
   players: PlayerConfig[];
   currentTurn: number;
   outcome: Outcome;
