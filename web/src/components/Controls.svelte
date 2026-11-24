@@ -26,6 +26,15 @@
     }
   });
 
+  const isDirty = $derived(
+    boardSize !== config.boardSize ||
+      winLength !== config.winLength ||
+      fourCorners !== config.fourCorners ||
+      algorithm !== aiAlgorithm ||
+      budget !== timeBudgetMs ||
+      playerTypes.some((type, idx) => type !== config.players[idx]?.kind.type)
+  );
+
   function apply() {
     const players = config.players.map((p, idx) => ({
       ...p,
@@ -103,7 +112,7 @@
     {/each}
   </div>
 
-  <button type="button" class="apply-btn" onclick={apply}>
+  <button type="button" class="apply-btn" onclick={apply} disabled={!isDirty}>
     Apply
   </button>
 </section>
@@ -241,7 +250,12 @@
     font-weight: 600;
   }
 
-  .apply-btn:hover {
+  .apply-btn:not(:disabled):hover {
     filter: brightness(1.08);
+  }
+
+  .apply-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 </style>

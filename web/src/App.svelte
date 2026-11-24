@@ -3,6 +3,7 @@
   import Board from './components/Board.svelte';
   import Controls from './components/Controls.svelte';
   import TelemetryHud from './components/TelemetryHud.svelte';
+  import Toast from './components/Toast.svelte';
   import { EngineClient } from './lib/engineClient';
   import type {
     AiAlgorithm,
@@ -46,6 +47,8 @@
   let thinking = $state(false);
   let started = $state(false);
   let errorMsg = $state<string | null>(null);
+  let toastMessage = $state<string | null>(null);
+  let toastKey = $state(0);
   let runToken = 0;
 
   async function driveAiTurns(token: number) {
@@ -77,8 +80,8 @@
     }
   }
 
-  async function initBoard(nextConfig: GameConfig, autoStart: boolean) {
-    if (!client) return;
+  async function initBoard(nextConfig: GameConfig, autoStart: boolean): Promise<boolean> {
+    if (!client) return false;
     const token = ++runToken;
     errorMsg = null;
     telemetry = null;
@@ -89,8 +92,10 @@
       if (autoStart) {
         await driveAiTurns(token);
       }
+      return true;
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : String(err);
+      return false;
     }
   }
 
@@ -147,11 +152,15 @@
     snapshot = await client.reset();
   }
 
-  function handleApply(next: GameConfig, algo: AiAlgorithm, budget: number) {
-    config = next;
-    aiAlgorithm = algo;
-    timeBudgetMs = budget;
-    initBoard(next, false);
+  async function handleApply(next: GameConfig, algo: AiAlgorithm, budget: number) {
+    const ok = await initBoard(next, false);
+    if (ok) {
+      config = next;
+      aiAlgorithm = algo;
+      timeBudgetMs = budget;
+      toastMessage = `Settings applied (${next.boardSize}x${next.boardSize}, ${next.winLength} in a row).`;
+      toastKey += 1;
+    }
   }
 
   onMount(() => {
@@ -229,6 +238,12 @@
     </aside>
   </div>
 </main>
+
+<Toast
+  message={toastMessage}
+  {toastKey}
+  onDismiss={() => (toastMessage = null)}
+/>
 
 <style>
   .layout {
