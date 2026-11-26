@@ -6,9 +6,9 @@
   import Toast from './components/Toast.svelte';
   import { EngineClient } from './lib/engineClient';
   import type {
-    AiAlgorithm,
     GameConfig,
     GameSnapshot,
+    PlayerTelemetryState,
     SearchTelemetry,
   } from './types';
 
@@ -21,7 +21,7 @@
         name: 'Zalgo',
         symbol: '❤',
         color: '#e879f9',
-        kind: { type: 'ai', algorithm: 'paranoid', timeBudgetMs: 120, maxDepth: 12 },
+        kind: { type: 'ai', algorithm: 'paranoid', timeBudgetMs: 120, maxDepth: 16 },
       },
       {
         name: 'Brent',
@@ -38,20 +38,78 @@
     ],
   };
 
+  function emptyStats(count: number): PlayerTelemetryState[] {
+    return Array.from({ length: count }, () => ({
+      turnCount: 0,
+      totalTimeMs: 0,
+      aiHistory: [],
+      totalNodes: 0,
+      totalTtHits: 0,
+      peakNodesPerSec: 0,
+      depthSum: 0,
+      humanMoveTimesMs: [],
+      fastestHumanMs: null,
+      slowestHumanMs: null,
+    }));
+  }
+
   let client: EngineClient | null = null;
   let config = $state<GameConfig>(initialConfig);
-  let aiAlgorithm = $state<AiAlgorithm>('paranoid');
-  let timeBudgetMs = $state(120);
   let snapshot = $state<GameSnapshot | null>(null);
-  let telemetry = $state<SearchTelemetry | null>(null);
-  let telemetryHistory = $state<SearchTelemetry[]>([]);
-  let aiTurnCount = $state(0);
+  let playerStats = $state<PlayerTelemetryState[]>(emptyStats(initialConfig.players.length));
+  let resetKey = $state(0);
   let thinking = $state(false);
   let started = $state(false);
   let errorMsg = $state<string | null>(null);
   let toastMessage = $state<string | null>(null);
   let toastKey = $state(0);
   let runToken = 0;
+  let humanTurnStartedAt: number | null = null;
+
+  function recordAiTurn(playerIdx: number, t: SearchTelemetry) {
+    const prev = playerStats[playerIdx];
+    if (!prev) return;
+    const updated: PlayerTelemetryState = {
+      ...prev,
+      turnCount: prev.turnCount + 1,
+      totalTimeMs: prev.totalTimeMs + t.elapsedMs,
+      aiHistory: [...prev.aiHistory.slice(-15), t],
+      totalNodes: prev.totalNodes + t.nodesEvaluated,
+      totalTtHits: prev.totalTtHits + t.ttHits,
+      peakNodesPerSec: Math.max(prev.peakNodesPerSec, t.nodesPerSec),
+      depthSum: prev.depthSum + t.depthReached,
+    };
+    playerStats = playerStats.map((s, i) => (i === playerIdx ? updated : s));
+  }
+
+  function recordHumanTurn(playerIdx: number, elapsedMs: number) {
+    const prev = playerStats[playerIdx];
+    if (!prev) return;
+    const clamped = Math.max(1, elapsedMs);
+    const updated: PlayerTelemetryState = {
+      ...prev,
+      turnCount: prev.turnCount + 1,
+      totalTimeMs: prev.totalTimeMs + clamped,
+      humanMoveTimesMs: [...prev.humanMoveTimesMs.slice(-15), clamped],
+      fastestHumanMs:
+        prev.fastestHumanMs === null ? clamped : Math.min(prev.fastestHumanMs, clamped),
+      slowestHumanMs:
+        prev.slowestHumanMs === null ? clamped : Math.max(prev.slowestHumanMs, clamped),
+    };
+    playerStats = playerStats.map((s, i) => (i === playerIdx ? updated : s));
+  }
+
+  function markNextHumanClock() {
+    if (
+      snapshot &&
+      snapshot.outcome.status === 'ongoing' &&
+      snapshot.players[snapshot.currentTurn].kind.type === 'human'
+    ) {
+      humanTurnStartedAt = performance.now();
+    } else {
+      humanTurnStartedAt = null;
+    }
+  }
 
   async function driveAiTurns(token: number) {
     while (
@@ -62,17 +120,15 @@
       snapshot.outcome.status === 'ongoing' &&
       snapshot.players[snapshot.currentTurn].kind.type === 'ai'
     ) {
+      const actingPlayer = snapshot.currentTurn;
       thinking = true;
       try {
-        // Brief yield so the UI paints the previous move cleanly.
         await new Promise((r) => setTimeout(r, 80));
         if (token !== runToken) return;
         const resp = await client.playAiTurn();
         if (token !== runToken) return;
         snapshot = resp.state;
-        telemetry = resp.result.telemetry;
-        telemetryHistory = [...telemetryHistory.slice(-15), resp.result.telemetry];
-        aiTurnCount += 1;
+        recordAiTurn(actingPlayer, resp.result.telemetry);
       } catch (err) {
         errorMsg = err instanceof Error ? err.message : String(err);
         break;
@@ -82,21 +138,26 @@
         }
       }
     }
+    if (token === runToken) {
+      markNextHumanClock();
+    }
   }
 
   async function initBoard(nextConfig: GameConfig, autoStart: boolean): Promise<boolean> {
     if (!client) return false;
     const token = ++runToken;
     errorMsg = null;
-    telemetry = null;
-    telemetryHistory = [];
-    aiTurnCount = 0;
+    playerStats = emptyStats(nextConfig.players.length);
+    resetKey += 1;
     thinking = false;
     started = autoStart;
+    humanTurnStartedAt = null;
     try {
       snapshot = await client.init($state.snapshot(nextConfig));
       if (autoStart) {
         await driveAiTurns(token);
+      } else {
+        markNextHumanClock();
       }
       return true;
     } catch (err) {
@@ -109,10 +170,9 @@
     if (!client || thinking) return;
     const token = ++runToken;
     errorMsg = null;
-    telemetry = null;
-    telemetryHistory = [];
-    aiTurnCount = 0;
+    playerStats = emptyStats(config.players.length);
     started = true;
+    humanTurnStartedAt = null;
     try {
       if (!snapshot || snapshot.history.length > 0 || snapshot.outcome.status !== 'ongoing') {
         snapshot = await client.reset();
@@ -125,14 +185,20 @@
 
   async function handlePlay(cell: number) {
     if (!client || thinking || !snapshot) return;
-    if (!started && snapshot.players[snapshot.currentTurn].kind.type === 'ai') {
+    const actingPlayer = snapshot.currentTurn;
+    if (!started && snapshot.players[actingPlayer].kind.type === 'ai') {
       return;
     }
+    const elapsed =
+      humanTurnStartedAt !== null ? performance.now() - humanTurnStartedAt : 0;
     const token = ++runToken;
     started = true;
     errorMsg = null;
     try {
       snapshot = await client.playMove(cell);
+      if (elapsed > 0) {
+        recordHumanTurn(actingPlayer, elapsed);
+      }
       await driveAiTurns(token);
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : String(err);
@@ -145,6 +211,7 @@
     errorMsg = null;
     try {
       snapshot = await client.undo();
+      markNextHumanClock();
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : String(err);
     }
@@ -154,20 +221,18 @@
     if (!client) return;
     ++runToken;
     errorMsg = null;
-    telemetry = null;
-    telemetryHistory = [];
-    aiTurnCount = 0;
+    playerStats = emptyStats(config.players.length);
     thinking = false;
     started = false;
+    humanTurnStartedAt = null;
     snapshot = await client.reset();
+    markNextHumanClock();
   }
 
-  async function handleApply(next: GameConfig, algo: AiAlgorithm, budget: number) {
+  async function handleApply(next: GameConfig) {
     const ok = await initBoard(next, false);
     if (ok) {
       config = next;
-      aiAlgorithm = algo;
-      timeBudgetMs = budget;
       toastMessage = `Settings applied (${next.boardSize}x${next.boardSize}, ${next.winLength} in a row).`;
       toastKey += 1;
     }
@@ -188,7 +253,7 @@
   <header class="topbar">
     <div>
       <h1>Tic-Tac-Twist Neo</h1>
-      <p class="subtitle">u128 Bitboard Engine · Rust → WASM Worker · Svelte 5</p>
+      <p class="subtitle">u128 Bitboard Engine · Rust WASM Worker · Svelte 5</p>
     </div>
     <div class="actions">
       <button type="button" onclick={handleUndo} disabled={thinking || !snapshot?.history.length}>
@@ -238,20 +303,20 @@
 
         <Board {snapshot} disabled={thinking || awaitingStart} onPlay={handlePlay} />
         <TelemetryHud
-          {telemetry}
-          history={telemetryHistory}
-          turnCount={aiTurnCount}
+          players={snapshot.players}
+          {playerStats}
+          currentTurn={snapshot.currentTurn}
           {thinking}
-          {aiAlgorithm}
-          {timeBudgetMs}
+          outcome={snapshot.outcome}
+          {resetKey}
         />
       {:else}
-        <p class="loading">Loading Rust WASM engine…</p>
+        <p class="loading">Loading Rust WASM engine...</p>
       {/if}
     </div>
 
     <aside class="sidebar">
-      <Controls {config} {aiAlgorithm} {timeBudgetMs} onApply={handleApply} />
+      <Controls {config} onApply={handleApply} />
     </aside>
   </div>
 </main>

@@ -66,3 +66,18 @@ export interface AiTurnResponse {
   result: SearchResult;
   state: GameSnapshot;
 }
+
+export interface PlayerTelemetryState {
+  turnCount: number;
+  totalTimeMs: number;
+  /** Last 16 AI telemetry records for sparkline + latest gauge */
+  aiHistory: SearchTelemetry[];
+  totalNodes: number;
+  totalTtHits: number;
+  peakNodesPerSec: number;
+  depthSum: number;
+  /** Last 16 human move durations in ms */
+  humanMoveTimesMs: number[];
+  fastestHumanMs: number | null;
+  slowestHumanMs: number | null;
+}
