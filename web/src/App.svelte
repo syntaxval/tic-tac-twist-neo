@@ -44,6 +44,8 @@
   let timeBudgetMs = $state(120);
   let snapshot = $state<GameSnapshot | null>(null);
   let telemetry = $state<SearchTelemetry | null>(null);
+  let telemetryHistory = $state<SearchTelemetry[]>([]);
+  let aiTurnCount = $state(0);
   let thinking = $state(false);
   let started = $state(false);
   let errorMsg = $state<string | null>(null);
@@ -69,6 +71,8 @@
         if (token !== runToken) return;
         snapshot = resp.state;
         telemetry = resp.result.telemetry;
+        telemetryHistory = [...telemetryHistory.slice(-15), resp.result.telemetry];
+        aiTurnCount += 1;
       } catch (err) {
         errorMsg = err instanceof Error ? err.message : String(err);
         break;
@@ -85,6 +89,8 @@
     const token = ++runToken;
     errorMsg = null;
     telemetry = null;
+    telemetryHistory = [];
+    aiTurnCount = 0;
     thinking = false;
     started = autoStart;
     try {
@@ -104,6 +110,8 @@
     const token = ++runToken;
     errorMsg = null;
     telemetry = null;
+    telemetryHistory = [];
+    aiTurnCount = 0;
     started = true;
     try {
       if (!snapshot || snapshot.history.length > 0 || snapshot.outcome.status !== 'ongoing') {
@@ -147,6 +155,8 @@
     ++runToken;
     errorMsg = null;
     telemetry = null;
+    telemetryHistory = [];
+    aiTurnCount = 0;
     thinking = false;
     started = false;
     snapshot = await client.reset();
@@ -227,7 +237,14 @@
         </div>
 
         <Board {snapshot} disabled={thinking || awaitingStart} onPlay={handlePlay} />
-        <TelemetryHud {telemetry} {thinking} />
+        <TelemetryHud
+          {telemetry}
+          history={telemetryHistory}
+          turnCount={aiTurnCount}
+          {thinking}
+          {aiAlgorithm}
+          {timeBudgetMs}
+        />
       {:else}
         <p class="loading">Loading Rust WASM engine…</p>
       {/if}

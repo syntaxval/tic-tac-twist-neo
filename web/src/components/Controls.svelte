@@ -26,12 +26,18 @@
     }
   });
 
+  const isGreedy = $derived(algorithm === 'greedy');
+
+  function formatBudget(ms: number): string {
+    return ms >= 1000 ? `${(ms / 1000).toFixed(2).replace(/\.?0+$/, '')} s` : `${ms} ms`;
+  }
+
   const isDirty = $derived(
     boardSize !== config.boardSize ||
       winLength !== config.winLength ||
       fourCorners !== config.fourCorners ||
       algorithm !== aiAlgorithm ||
-      budget !== timeBudgetMs ||
+      (!isGreedy && budget !== timeBudgetMs) ||
       playerTypes.some((type, idx) => type !== config.players[idx]?.kind.type)
   );
 
@@ -44,7 +50,7 @@
               type: 'ai' as const,
               algorithm,
               timeBudgetMs: budget,
-              maxDepth: 12,
+              maxDepth: 16,
             }
           : { type: 'human' as const },
     }));
@@ -89,9 +95,24 @@
     </select>
   </div>
 
-  <div class="field">
-    <label for="ai-budget">AI time budget: <strong>{budget} ms</strong></label>
-    <input id="ai-budget" type="range" min="20" max="500" step="20" bind:value={budget} />
+  <div class="field" class:disabled-field={isGreedy}>
+    <label for="ai-budget">
+      AI time budget:
+      {#if isGreedy}
+        <strong>N/A (1-ply)</strong>
+      {:else}
+        <strong>{formatBudget(budget)}</strong>
+      {/if}
+    </label>
+    <input
+      id="ai-budget"
+      type="range"
+      min="20"
+      max="2000"
+      step="20"
+      disabled={isGreedy}
+      bind:value={budget}
+    />
   </div>
 
   <div class="roster">
@@ -137,6 +158,14 @@
     display: grid;
     gap: 0.35rem;
     font-size: 0.875rem;
+  }
+
+  .field.disabled-field {
+    opacity: 0.5;
+  }
+
+  .field.disabled-field input {
+    cursor: not-allowed;
   }
 
   .checkbox {
